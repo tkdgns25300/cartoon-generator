@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Random Number Generator</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+                background-color: #f0f2f5;
+            }
+            .container {
+                text-align: center;
+                padding: 40px;
+                border-radius: 10px;
+                background-color: white;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            }
+            h1 {
+                color: #333;
+            }
+            .btn {
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 15px 30px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 16px;
+                margin: 20px 0;
+                cursor: pointer;
+                border-radius: 5px;
+                transition: background-color 0.3s;
+            }
+            .btn:hover {
+                background-color: #0056b3;
+            }
+            .result {
+                font-size: 24px;
+                color: #333;
+                margin-top: 20px;
+                min-height: 30px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Random Number Generator</h1>
+            <form th:action="@{/generate}" method="post">
+                <button type="submit" class="btn">Generate Random Number</button>
+            </form>
+
+            <div class="result">
+                <p th:if="${randomNumber}" th:text="'Your random number is: ' + ${randomNumber}"></p>
+            </div>
+        </div>
+    </body>
+</html>
