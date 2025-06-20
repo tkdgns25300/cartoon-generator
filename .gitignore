@@ -121,6 +121,10 @@ fabric.properties
 # Log file
 *.log
 
+# Application-specific properties
+application.properties
+application-*.properties
+
 # BlueJ files
 *.ctxt
 
@@ -139,6 +143,9 @@ fabric.properties
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# Environment-specific files
+.env
 
 # End of https://www.toptal.com/developers/gitignore/api/java,intellij
 
