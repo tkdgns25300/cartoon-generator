@@ -1,0 +1,77 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: "Spring Boot MVC + Thymeleaf project conventions (Lombok, MVC, REST)"
+globs: ["src/main/java/**/*.java", "src/main/resources/templates/**/*.html"]
+alwaysApply: true
+---
+
+### 🌐 General
+- All source files **UTF‑8**, 4‑space indentation, max 120 cols.
+- Follow **Google Java Style**; organize imports automatically.
+
+### 📦 Package Layout
+```
+com.example.project
+ ├─ config        // configuration & security
+ ├─ controller    // @Controller / @RestController
+ ├─ domain        // JPA entities & enums
+ ├─ dto           // request / response DTOs
+ ├─ repository    // Spring‑Data interfaces
+ ├─ service       // business interfaces
+ └─ service.impl  // implementation classes
+```
+
+### 🛡 Controllers
+- Class name **ends with `Controller`** and annotated with `@Controller` (or `@RestController` for JSON).
+- Constructor injection via **`@RequiredArgsConstructor`**; no `@Autowired` field injection.
+- Map base path at class level → `@RequestMapping("/users")`.
+- **Return DTOs or view names**, never JPA entities.
+- Validate inputs with `@Valid` + `BindingResult`.
+
+### ⚙️ Services
+- Public interface: `UserService` → impl: `UserServiceImpl`.
+- Mark interfaces or read‑only methods with `@Transactional(readOnly = true)`.
+- Business logic only—**no** web or persistence code.
+
+### 🗄 Repositories
+- Extend `JpaRepository<Entity, Id>`.
+- Prefer query‑method names; use `@Query` for complex JPQL.
+
+### 📄 DTO / Mapper
+- All external IO (controller <‑> service) goes through **DTOs**.
+- Mapping handled by MapStruct or manual mapper in `dto.mapper` package.
+
+### 📝 Lombok Usage
+- Use `@Getter` on entities, `@Builder` on immutables.
+- Avoid `@Setter` on entities—encapsulate state changes with methods.
+- Add `@Slf4j` for logging; use placeholder syntax (`log.info("User id={} created", id)`).
+
+### 💥 Exception Handling
+- `@RestControllerAdvice` / `@ControllerAdvice` with global handlers.
+- Custom exceptions extend `RuntimeException`.
+
+### 🧪 Testing
+- Unit: **JUnit 5 + Mockito**
+- Integration: `@SpringBootTest(webEnvironment=RANDOM_PORT)`.
+- Use Testcontainers for DB integration when possible.
+
+### 🌿 Thymeleaf Templates (`*.html`)
+- Follow **BEM** class naming.
+- Use fragments for layout (header, footer, etc.).
+- Bind forms with `th:object`, fields with `th:field`.
+- Avoid inline JS; keep scripts in `/static/js`.
+
+### 🔧 Build & Tools
+- Maven wrapper `mvnw` committed.
+- Enable **SpotBugs + Checkstyle** in CI.
+
+### 📜 Documentation
+- Public classes/methods require **Javadoc**.
+- Add Swagger/OpenAPI annotations for REST endpoints.
+
+---
+# End of rule
