@@ -15,6 +15,22 @@
                 padding: 2rem;
                 box-sizing: border-box;
             }
+            .nav-links {
+                margin-bottom: 2rem;
+            }
+            .nav-links a {
+                text-decoration: none;
+                color: #007bff;
+                font-size: 1.2rem;
+                margin: 0 1rem;
+                padding: 0.5rem 1rem;
+                border-radius: 5px;
+                transition: background-color 0.3s;
+            }
+            .nav-links a:hover,
+            .nav-links a.active {
+                background-color: #e9ecef;
+            }
             .container {
                 width: 100%;
                 max-width: 800px;
@@ -61,7 +77,7 @@
                 max-width: 100%;
                 border-radius: 10px;
                 margin-top: 1rem;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             }
             .error {
                 color: #d93025;
@@ -72,14 +88,29 @@
     <body>
         <div class="container">
             <h1>Cartoon Generator</h1>
+
+            <div class="nav-links">
+                <a href="/" class="active">Single Image Generator</a>
+                <a href="/cartoon">10-Panel Cartoon Generator</a>
+            </div>
+
             <form th:action="@{/generate}" method="post">
-                <textarea name="prompt" rows="3" placeholder="Enter a description for the image you want to generate..." th:text="${prompt}"></textarea>
+                <textarea
+                    name="prompt"
+                    rows="3"
+                    placeholder="Enter a description for the image you want to generate..."
+                    th:text="${prompt}"
+                ></textarea>
                 <button type="submit" class="btn">Generate Image</button>
             </form>
 
             <div class="result">
                 <div th:if="${generatedImage}">
-                    <img th:src="'data:image/png;base64,' + ${generatedImage}" alt="Generated Image" class="generated-image" />
+                    <img
+                        th:src="'data:image/png;base64,' + ${generatedImage}"
+                        alt="Generated Image"
+                        class="generated-image"
+                    />
                 </div>
                 <div th:if="${error}" class="error">
                     <p th:text="${error}"></p>

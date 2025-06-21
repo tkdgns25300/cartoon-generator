@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Your Cartoon</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+        <style>
+            body {
+                padding: 2rem;
+            }
+            .container {
+                max-width: 1200px;
+            }
+            .cartoon-panel {
+                border: 2px solid #333;
+                margin-bottom: 1rem;
+                padding: 0.5rem;
+                background-color: #f8f9fa;
+            }
+            .cartoon-panel img {
+                max-width: 100%;
+                height: auto;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1 class="mb-4">Here is Your Cartoon!</h1>
+
+            <div th:if="${error}" class="alert alert-danger" role="alert">
+                <p th:text="${error}">An error occurred.</p>
+                <a href="/cartoon" class="btn btn-primary">Try again</a>
+            </div>
+
+            <div th:if="${images}" class="row">
+                <div th:each="image, iterStat : ${images}" class="col-md-6 col-lg-4">
+                    <div class="cartoon-panel">
+                        <h5 class="text-center" th:text="'Panel ' + ${iterStat.count}">Panel</h5>
+                        <img th:src="'data:image/png;base64,' + ${image}" alt="Generated Cartoon Panel" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <a href="/cartoon" class="btn btn-secondary">Create Another Cartoon</a>
+            </div>
+        </div>
+    </body>
+</html>

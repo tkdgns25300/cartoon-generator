@@ -152,3 +152,9 @@ replay_pid*
 ### Gradle
 /build/
 /.gradle/
+
+### VSCode ###
+.vscode/
+
+### Idea ###
+.idea/
