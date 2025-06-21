@@ -157,4 +157,4 @@ replay_pid*
 .vscode/
 
 ### Idea ###
-.idea/
+.idea/misc.xml

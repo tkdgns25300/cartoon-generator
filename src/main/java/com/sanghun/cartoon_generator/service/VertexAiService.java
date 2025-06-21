@@ -57,20 +57,54 @@ public class VertexAiService {
                 .bodyValue(request)
                 .retrieve()
                 .bodyToMono(ImagenResponse.class)
-                .map(response -> {
+                .flatMap(response -> {
                     if (response != null && response.getPredictions() != null && !response.getPredictions().isEmpty()) {
-                        return response.getPredictions().get(0).getBytesBase64Encoded();
+                        String base64Image = response.getPredictions().get(0).getBytesBase64Encoded();
+                        if (base64Image != null) {
+                            return Mono.just(base64Image);
+                        }
                     }
-                    return null;
+                    return Mono.empty();
                 });
     }
 
-    public Mono<String> getPromptsFromStory(String story) throws IOException {
-        String promptText = "Divide the following story into 10 sequential scenes for a webtoon. " +
-                "For each scene, provide a concise and descriptive prompt for an image generation AI. " +
-                "The output should be a numbered list of prompts, with each prompt on a new line, like '1. prompt a', '2. prompt b'. " +
-                "Do not include any other text or explanations. " +
-                "Story: " + story;
+    public Mono<String> getCharacterDescriptions(String story) throws IOException {
+        String promptText = "You are a character designer. Read the following story and create a detailed visual description for each main character. " +
+                "Describe their appearance, clothing, and key features in a consistent manner that can be used by an image generation AI. " +
+                "The output should be a simple list of character descriptions. " +
+                "Example: 'CHARACTER 1 (Brave Knight): A young man with short brown hair, wearing shining silver armor with a red cape. He has a determined expression.'\n" +
+                "--- STORY ---\n" + story;
+
+        GeminiRequest.Part part = new GeminiRequest.Part(promptText);
+        GeminiRequest.Content content = new GeminiRequest.Content("user", Collections.singletonList(part));
+        GeminiRequest.GenerationConfig config = new GeminiRequest.GenerationConfig(1.0f, 32, 1, 8192, Collections.emptyList());
+        GeminiRequest request = new GeminiRequest(content, config);
+
+        return webClient.post()
+                .uri(geminiApiUrl)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + getAccessToken())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .retrieve()
+                .bodyToMono(GeminiResponse.class)
+                .map(GeminiResponse::getFirstCandidateText);
+    }
+
+    public Mono<String> getPromptsFromStory(String story, String characterDescriptions, boolean includeDialogue) throws IOException {
+        String dialogueInstruction = includeDialogue ?
+                "For each of the 10 scenes, you MUST invent and include a short line of English dialogue in a speech bubble." :
+                "You MUST NOT include any dialogue or text in the images.";
+
+        String characterInstruction = "You MUST ensure all characters are visually consistent across all panels by using the following detailed descriptions. When a character appears in a scene, you MUST incorporate their full description from the list below directly into the prompt for that scene. Example: 'A brave knight (a young man with short brown hair, wearing shining silver armor and a red cape) enters a dark cave.'\n" +
+                "--- CHARACTER DESCRIPTIONS ---\n" +
+                characterDescriptions + "\n" +
+                "----------------------------\n\n";
+
+        String promptText = "You are a webtoon prompt engineer. Your task is to create 10 sequential image generation prompts based on the provided story and character descriptions.\n" +
+                characterInstruction +
+                "The output must be a numbered list of 10 prompts. Each prompt must be a single, continuous sentence. Do not add any introductory text.\n" +
+                dialogueInstruction +
+                "\n--- STORY ---\n" + story;
 
         GeminiRequest.Part part = new GeminiRequest.Part(promptText);
         GeminiRequest.Content content = new GeminiRequest.Content("user", Collections.singletonList(part));

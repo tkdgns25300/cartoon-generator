@@ -23,7 +23,7 @@ public class CartoonController {
 
     @PostMapping("/generate")
     public String generateCartoon(@ModelAttribute CartoonGenerationRequest request) {
-        String jobId = cartoonGenerationService.startCartoonGeneration(request.getStory());
+        String jobId = cartoonGenerationService.startCartoonGeneration(request.getStory(), request.isIncludeDialogue());
         return "redirect:/cartoon/loading/" + jobId;
     }
 
@@ -43,7 +43,9 @@ public class CartoonController {
     public String resultPage(@PathVariable String jobId, Model model) {
         JobStatus status = cartoonGenerationService.getJobStatus(jobId);
         if (status != null && "COMPLETED".equals(status.getStatus())) {
-            model.addAttribute("images", status.getResults());
+            model.addAttribute("story", status.getStory());
+            model.addAttribute("characterDescriptions", status.getCharacterDescriptions());
+            model.addAttribute("panels", status.getResults());
         } else {
             // Handle cases where the job is not found, not complete, or failed
             model.addAttribute("error", "Cartoon generation failed or is still in progress.");

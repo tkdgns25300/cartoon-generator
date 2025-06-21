@@ -14,5 +14,7 @@ import java.util.List;
 public class JobStatus {
     private String status; // "PROCESSING", "COMPLETED", "FAILED"
     private int progress; // 0-100
-    private List<String> results; // list of base64 encoded images
+    private String story;
+    private String characterDescriptions;
+    private List<PanelResult> results; // list of PanelResult objects
 } 

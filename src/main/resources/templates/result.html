@@ -7,41 +7,77 @@
         <style>
             body {
                 padding: 2rem;
+                background-color: #f8f9fa;
             }
             .container {
                 max-width: 1200px;
             }
+            .story-box {
+                background-color: white;
+                padding: 1.5rem;
+                border-radius: 0.5rem;
+                margin-bottom: 2rem;
+                border: 1px solid #dee2e6;
+            }
             .cartoon-panel {
-                border: 2px solid #333;
-                margin-bottom: 1rem;
-                padding: 0.5rem;
-                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                margin-bottom: 1.5rem;
+                padding: 1rem;
+                background-color: white;
+                border-radius: 0.5rem;
+                display: flex;
+                flex-direction: column;
+                height: 100%;
             }
             .cartoon-panel img {
                 max-width: 100%;
                 height: auto;
+                border-radius: 0.25rem;
+            }
+            .prompt-text {
+                font-size: 0.85rem;
+                color: #6c757d;
+                margin-top: 1rem;
+                word-break: break-word;
+                flex-grow: 1;
             }
         </style>
     </head>
     <body>
         <div class="container">
-            <h1 class="mb-4">Here is Your Cartoon!</h1>
+            <h1 class="mb-4 text-center">Here is Your Cartoon!</h1>
 
             <div th:if="${error}" class="alert alert-danger" role="alert">
                 <p th:text="${error}">An error occurred.</p>
                 <a href="/cartoon" class="btn btn-primary">Try again</a>
             </div>
 
-            <div th:if="${images}" class="row">
-                <div th:each="image, iterStat : ${images}" class="col-md-6 col-lg-4">
-                    <div class="cartoon-panel">
-                        <h5 class="text-center" th:text="'Panel ' + ${iterStat.count}">Panel</h5>
-                        <img th:src="'data:image/png;base64,' + ${image}" alt="Generated Cartoon Panel" />
+            <div th:if="${panels}">
+                <div class="story-box">
+                    <h5>Original Story</h5>
+                    <p class="mb-0" th:text="${story}"></p>
+                </div>
+
+                <div class="story-box" th:if="${characterDescriptions}">
+                    <h5>AI-Generated Character Descriptions</h5>
+                    <p class="mb-0" style="white-space: pre-wrap" th:text="${characterDescriptions}"></p>
+                </div>
+
+                <div class="row">
+                    <div th:each="panel, iterStat : ${panels}" class="col-md-6 col-lg-4 d-flex align-items-stretch">
+                        <div class="cartoon-panel w-100">
+                            <h6 class="text-center mb-2" th:text="'Panel ' + ${iterStat.count}">Panel</h6>
+                            <img th:src="'data:image/png;base64,' + ${panel.image}" alt="Generated Cartoon Panel" />
+                            <p class="prompt-text mt-3">
+                                <strong>Prompt:</strong>
+                                <span th:text="${panel.prompt}"></span>
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="mt-4">
+            <div class="text-center mt-4">
                 <a href="/cartoon" class="btn btn-secondary">Create Another Cartoon</a>
             </div>
         </div>

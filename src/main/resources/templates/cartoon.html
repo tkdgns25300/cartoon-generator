@@ -29,6 +29,15 @@
                         placeholder="A brave knight travels to a dark castle to rescue a captured dragon..."
                     ></textarea>
                 </div>
+                <div class="form-check mb-3">
+                    <input
+                        class="form-check-input"
+                        type="checkbox"
+                        id="includeDialogue"
+                        th:field="*{includeDialogue}"
+                    />
+                    <label class="form-check-label" for="includeDialogue"> Include English Dialogue </label>
+                </div>
                 <button type="submit" class="btn btn-primary">Generate Cartoon</button>
             </form>
         </div>
