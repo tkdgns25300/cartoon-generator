@@ -1,129 +1,149 @@
 package com.sanghun.cartoon_generator.service;
 
-import com.google.auth.oauth2.GoogleCredentials;
 import com.sanghun.cartoon_generator.dto.*;
+import com.google.auth.oauth2.GoogleCredentials;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.ExchangeStrategies;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class VertexAiService {
 
-    private final WebClient webClient;
+    private static final String IMAGEN_API_ENDPOINT_TEMPLATE = "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:predict";
+    private static final String GEMINI_API_ENDPOINT_TEMPLATE = "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent";
+
+    private final RestTemplate restTemplate;
     private final String projectId;
-    private final String imagenApiUrl;
-    private final String geminiApiUrl;
+    private final String region;
+    private final String geminiModelId;
+    private final String imagenModelId;
+    private final GoogleCredentials credentials;
 
-    public VertexAiService(WebClient.Builder webClientBuilder,
+    public VertexAiService(RestTemplate restTemplate,
                            @Value("${google.cloud.project-id}") String projectId,
-                           @Value("${google.cloud.imagen-model-id}") String imagenModelId,
-                           @Value("${google.cloud.gemini-model-id}") String geminiModelId) {
-
-        final int bufferSize = 16 * 1024 * 1024; // 16MB
-
-        ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
-                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(bufferSize))
-                .build();
-
-        this.webClient = webClientBuilder
-                .exchangeStrategies(exchangeStrategies)
-                .build();
+                           @Value("${google.cloud.region}") String region,
+                           @Value("${google.cloud.gemini-model-id}") String geminiModelId,
+                           @Value("${google.cloud.imagen-model-id}") String imagenModelId) throws IOException {
+        this.restTemplate = restTemplate;
         this.projectId = projectId;
-        this.imagenApiUrl = String.format(
-                "https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/google/models/%s:predict",
-                projectId, imagenModelId);
-        this.geminiApiUrl = String.format(
-                "https://us-central1-aiplatform.googleapis.com/v1/projects/%s/locations/us-central1/publishers/google/models/%s:generateContent",
-                projectId, geminiModelId);
+        this.region = region;
+        this.geminiModelId = geminiModelId;
+        this.imagenModelId = imagenModelId;
+        this.credentials = GoogleCredentials.getApplicationDefault()
+                .createScoped("https://www.googleapis.com/auth/cloud-platform");
     }
 
-    public Mono<String> generateImage(String prompt) throws IOException {
-        ImagenRequest request = new ImagenRequest(
-                Collections.singletonList(new Instance(prompt)),
-                new Parameters(1, true));
+    public String getCharacterDescriptions(String story) throws IOException {
+        log.info("Generating character descriptions for story...");
+        String prompt = "Analyze the main characters from the following story and create a detailed character sheet. " +
+                "For each character, describe their name, personality, and key visual features like clothing, species, and distinct marks. " +
+                "This sheet will be used to maintain character consistency across multiple images.\n\n" +
+                "Story: \"" + story + "\"";
 
-        return webClient.post()
-                .uri(imagenApiUrl)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + getAccessToken())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(ImagenResponse.class)
-                .flatMap(response -> {
-                    if (response != null && response.getPredictions() != null && !response.getPredictions().isEmpty()) {
-                        String base64Image = response.getPredictions().get(0).getBytesBase64Encoded();
-                        if (base64Image != null) {
-                            return Mono.just(base64Image);
-                        }
-                    }
-                    return Mono.empty();
-                });
+        GeminiRequest geminiRequest = GeminiRequest.fromPrompt(prompt);
+        String url = String.format(GEMINI_API_ENDPOINT_TEMPLATE, region, projectId, region, geminiModelId);
+
+        ResponseEntity<GeminiResponse> response = restTemplate.postForEntity(url, new HttpEntity<>(geminiRequest, createHeaders()), GeminiResponse.class);
+        log.info("Successfully generated character descriptions.");
+        return getTextFromGeminiResponse(response.getBody());
     }
 
-    public Mono<String> getCharacterDescriptions(String story) throws IOException {
-        String promptText = "You are a character designer. Read the following story and create a detailed visual description for each main character. " +
-                "Describe their appearance, clothing, and key features in a consistent manner that can be used by an image generation AI. " +
-                "The output should be a simple list of character descriptions. " +
-                "Example: 'CHARACTER 1 (Brave Knight): A young man with short brown hair, wearing shining silver armor with a red cape. He has a determined expression.'\n" +
-                "--- STORY ---\n" + story;
+    public List<String> getPanelPrompts(String story, String characterDescriptions, boolean includeDialogue) throws IOException {
+        log.info("Generating 10 panel prompts...");
+        String prompt = "Based on the provided story, divide it into exactly 10 sequential scenes and create a concise image generation prompt for each scene. " +
+                "These prompts will be used with a character reference image, so DO NOT include character descriptions in the prompts. Focus only on the action, setting, and mood of each scene. " +
+                "To avoid safety policy issues, do not use words that could be misinterpreted, such as 'dome', 'shaft', or words related to violence or anatomy. " +
+                "CRITICAL: Generate exactly 10 prompts separated by '---'. Do not include any introductory text, titles, or numbering. Just the prompts.";
 
-        GeminiRequest.Part part = new GeminiRequest.Part(promptText);
-        GeminiRequest.Content content = new GeminiRequest.Content("user", Collections.singletonList(part));
-        GeminiRequest.GenerationConfig config = new GeminiRequest.GenerationConfig(1.0f, 32, 1, 8192, Collections.emptyList());
-        GeminiRequest request = new GeminiRequest(content, config);
+        if (includeDialogue) {
+            prompt += "\nFor each prompt, add a simple, single-line dialogue in English inside quotation marks, suitable for a comic panel.";
+        }
 
-        return webClient.post()
-                .uri(geminiApiUrl)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + getAccessToken())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(GeminiResponse.class)
-                .map(GeminiResponse::getFirstCandidateText);
+        GeminiRequest geminiRequest = GeminiRequest.fromPrompt(prompt);
+        String url = String.format(GEMINI_API_ENDPOINT_TEMPLATE, region, projectId, region, geminiModelId);
+
+        ResponseEntity<GeminiResponse> response = restTemplate.postForEntity(url, new HttpEntity<>(geminiRequest, createHeaders()), GeminiResponse.class);
+        String fullResponse = getTextFromGeminiResponse(response.getBody());
+        log.info("Successfully generated 10 panel prompts.");
+        return Arrays.stream(fullResponse.split("---"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty() && !s.toLowerCase().contains("scenes with image generation prompts"))
+                .collect(Collectors.toList());
     }
 
-    public Mono<String> getPromptsFromStory(String story, String characterDescriptions, boolean includeDialogue) throws IOException {
-        String dialogueInstruction = includeDialogue ?
-                "For each of the 10 scenes, you MUST invent and include a short line of English dialogue in a speech bubble." :
-                "You MUST NOT include any dialogue or text in the images.";
+    public String generateCharacterReferenceImage(String characterDescriptions) throws IOException {
+        log.info("Generating character reference image...");
+        String prompt = "A character sheet of all main characters described below, standing side-by-side, full body shot, plain background, cartoon style. " +
+                "Characters: " + characterDescriptions;
 
-        String characterInstruction = "You MUST ensure all characters are visually consistent across all panels by using the following detailed descriptions. When a character appears in a scene, you MUST incorporate their full description from the list below directly into the prompt for that scene. Example: 'A brave knight (a young man with short brown hair, wearing shining silver armor and a red cape) enters a dark cave.'\n" +
-                "--- CHARACTER DESCRIPTIONS ---\n" +
-                characterDescriptions + "\n" +
-                "----------------------------\n\n";
+        ImagenRequest imagenRequest = ImagenRequest.fromInstance(Instance.fromPrompt(prompt));
+        String url = String.format(IMAGEN_API_ENDPOINT_TEMPLATE, region, projectId, region, imagenModelId);
+        ResponseEntity<ImagenResponse> response = restTemplate.postForEntity(url, new HttpEntity<>(imagenRequest, createHeaders()), ImagenResponse.class);
 
-        String promptText = "You are a webtoon prompt engineer. Your task is to create 10 sequential image generation prompts based on the provided story and character descriptions.\n" +
-                characterInstruction +
-                "The output must be a numbered list of 10 prompts. Each prompt must be a single, continuous sentence. Do not add any introductory text.\n" +
-                dialogueInstruction +
-                "\n--- STORY ---\n" + story;
+        if (response.getBody() != null && response.getBody().getPredictions() != null && !response.getBody().getPredictions().isEmpty()) {
+            String base64Image = response.getBody().getPredictions().get(0).getBytesBase64Encoded();
+            log.info("Successfully generated character reference image.");
+            return base64Image;
+        }
+        throw new IOException("Failed to generate character reference image from Vertex AI");
+    }
 
-        GeminiRequest.Part part = new GeminiRequest.Part(promptText);
-        GeminiRequest.Content content = new GeminiRequest.Content("user", Collections.singletonList(part));
-        GeminiRequest.GenerationConfig config = new GeminiRequest.GenerationConfig(1.0f, 32, 1, 8192, Collections.emptyList());
-        GeminiRequest request = new GeminiRequest(content, config);
+    public String generateImageFromPromptAndReference(String prompt, String referenceImageBase64) throws IOException {
+        Instance instance = Instance.fromPromptAndImage(prompt, referenceImageBase64);
+        ImagenRequest imagenRequest = ImagenRequest.fromInstance(instance);
 
-        return webClient.post()
-                .uri(geminiApiUrl)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + getAccessToken())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(GeminiResponse.class)
-                .map(GeminiResponse::getFirstCandidateText);
+        // NOTE: Use the model that supports image editing/reference. This might be a different model ID.
+        String url = String.format(IMAGEN_API_ENDPOINT_TEMPLATE, region, projectId, region, imagenModelId);
+
+        ResponseEntity<ImagenResponse> response = restTemplate.postForEntity(url, new HttpEntity<>(imagenRequest, createHeaders()), ImagenResponse.class);
+
+        if (response.getBody() != null && response.getBody().getPredictions() != null && !response.getBody().getPredictions().isEmpty()) {
+            return response.getBody().getPredictions().get(0).getBytesBase64Encoded();
+        }
+        throw new IOException("Failed to generate image from prompt and reference from Vertex AI");
+    }
+
+    public String generateSingleImage(String prompt) throws IOException {
+        log.info("Generating single image for prompt: {}", prompt);
+        Instance instance = Instance.fromPrompt(prompt);
+        ImagenRequest imagenRequest = ImagenRequest.fromInstance(instance);
+        String url = String.format(IMAGEN_API_ENDPOINT_TEMPLATE, region, projectId, region, imagenModelId);
+        ResponseEntity<ImagenResponse> response = restTemplate.postForEntity(url, new HttpEntity<>(imagenRequest, createHeaders()), ImagenResponse.class);
+
+        if (response.getBody() != null && response.getBody().getPredictions() != null && !response.getBody().getPredictions().isEmpty()) {
+            String base64Image = response.getBody().getPredictions().get(0).getBytesBase64Encoded();
+            log.info("Successfully generated single image.");
+            return base64Image;
+        }
+        throw new IOException("Failed to generate single image from Vertex AI");
+    }
+
+    private String getTextFromGeminiResponse(GeminiResponse response) {
+        if (response != null && response.getFirstCandidateText() != null) {
+            return response.getFirstCandidateText();
+        }
+        throw new IllegalStateException("Invalid GeminiResponse format or empty content.");
+    }
+
+    private HttpHeaders createHeaders() throws IOException {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(getAccessToken());
+        return headers;
     }
 
     private String getAccessToken() throws IOException {
-        GoogleCredentials credentials = GoogleCredentials.getApplicationDefault()
-                .createScoped(List.of("https://www.googleapis.com/auth/cloud-platform"));
         credentials.refreshIfExpired();
         return credentials.getAccessToken().getTokenValue();
     }

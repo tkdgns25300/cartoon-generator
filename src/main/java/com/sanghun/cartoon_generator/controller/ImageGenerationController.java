@@ -21,14 +21,13 @@ public class ImageGenerationController {
         return "index";
     }
 
-    @PostMapping("/generate")
+    @PostMapping("/generate-image")
     public String generateImage(@RequestParam("prompt") String prompt, Model model) {
         try {
-            String image_response = imageGenerationService.generateImage(prompt).block();
-            model.addAttribute("generatedImage", image_response);
+            String imageBase64 = imageGenerationService.generateImage(prompt);
+            model.addAttribute("generatedImage", imageBase64);
             model.addAttribute("prompt", prompt);
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
             model.addAttribute("error", "Error generating image: " + e.getMessage());
         }
         return "index";

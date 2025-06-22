@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 @RequiredArgsConstructor
@@ -22,9 +23,10 @@ public class CartoonController {
     }
 
     @PostMapping("/generate")
-    public String generateCartoon(@ModelAttribute CartoonGenerationRequest request) {
-        String jobId = cartoonGenerationService.startCartoonGeneration(request.getStory(), request.isIncludeDialogue());
-        return "redirect:/cartoon/loading/" + jobId;
+    public String generateCartoon(CartoonGenerationRequest request, RedirectAttributes redirectAttributes) {
+        String jobId = cartoonGenerationService.submitJob(request);
+        redirectAttributes.addAttribute("jobId", jobId);
+        return "redirect:/cartoon/loading/{jobId}";
     }
 
     @GetMapping("/loading/{jobId}")
