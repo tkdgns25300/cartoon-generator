@@ -13,5 +13,9 @@ public class Parameters {
     private int sampleCount;
 
     @JsonProperty("enhancePrompt")
-    private boolean enhancePrompt;
+    private boolean enhancePrompt = false;
+
+    public Parameters(int sampleCount) {
+        this.sampleCount = sampleCount;
+    }
 }

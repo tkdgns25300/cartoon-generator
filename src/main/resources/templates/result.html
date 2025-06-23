@@ -45,40 +45,30 @@
     </head>
     <body>
         <div class="container">
-            <h1 class="mb-4 text-center">Here is Your Cartoon!</h1>
-
-            <div th:if="${error}" class="alert alert-danger" role="alert">
-                <p th:text="${error}">An error occurred.</p>
-                <a href="/cartoon" class="btn btn-primary">Try again</a>
-            </div>
-
-            <div th:if="${panels}">
-                <div class="story-box">
-                    <h5>Original Story</h5>
-                    <p class="mb-0" th:text="${story}"></p>
-                </div>
-
-                <div class="story-box" th:if="${characterDescriptions}">
-                    <h5>AI-Generated Character Descriptions</h5>
-                    <p class="mb-0" style="white-space: pre-wrap" th:text="${characterDescriptions}"></p>
-                </div>
-
-                <div class="row">
-                    <div th:each="panel, iterStat : ${panels}" class="col-md-6 col-lg-4 d-flex align-items-stretch">
-                        <div class="cartoon-panel w-100">
-                            <h6 class="text-center mb-2" th:text="'Panel ' + ${iterStat.count}">Panel</h6>
-                            <img th:src="'data:image/png;base64,' + ${panel.image}" alt="Generated Cartoon Panel" />
-                            <p class="prompt-text mt-3">
-                                <strong>Prompt:</strong>
-                                <span th:text="${panel.prompt}"></span>
-                            </p>
+            <h1 class="my-4 text-center">Generated Cartoon</h1>
+            <h2 class="text-center" th:text="${originalStory}"></h2>
+            <div class="row">
+                <div th:each="panel, iterStat : ${panelResults}" class="col-md-4 mb-4">
+                    <div class.card>
+                        <div class="card-header" th:text="'Panel ' + ${iterStat.count}"></div>
+                        <div class="card-body">
+                            <div th:if="${panel.status == 'success' and panel.imageData != null}">
+                                <img
+                                    th:src="@{'data:image/png;base64,' + ${panel.imageData}}"
+                                    class="img-fluid"
+                                    alt="Generated Cartoon Panel"
+                                />
+                            </div>
+                            <div th:if="${panel.status == 'failed'}" class="text-center p-5">
+                                <p class="text-danger">Image generation failed.</p>
+                            </div>
+                            <p class="card-text mt-2" th:text="${prompts[iterStat.index]}"></p>
                         </div>
                     </div>
                 </div>
             </div>
-
             <div class="text-center mt-4">
-                <a href="/cartoon" class="btn btn-secondary">Create Another Cartoon</a>
+                <a href="/" class="btn btn-primary">Back to Home</a>
             </div>
         </div>
     </body>

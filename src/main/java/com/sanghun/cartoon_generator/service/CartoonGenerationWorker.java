@@ -1,107 +1,107 @@
 package com.sanghun.cartoon_generator.service;
 
-import com.sanghun.cartoon_generator.dto.CartoonGenerationRequest;
 import com.sanghun.cartoon_generator.dto.JobStatus;
 import com.sanghun.cartoon_generator.dto.PanelResult;
-import com.sanghun.cartoon_generator.dto.Prediction;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
-@Slf4j
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class CartoonGenerationWorker {
 
     private final VertexAiService vertexAiService;
-    private final Map<String, JobStatus> jobStatuses;
-    private final Executor cartoonTaskExecutor;
-
-    public CartoonGenerationWorker(VertexAiService vertexAiService, Map<String, JobStatus> jobStatuses, @Qualifier("cartoonTaskExecutor") Executor cartoonTaskExecutor) {
-        this.vertexAiService = vertexAiService;
-        this.jobStatuses = jobStatuses;
-        this.cartoonTaskExecutor = cartoonTaskExecutor;
-    }
-
-    private void updateJobProgress(String jobId, String message, int progress) {
-        JobStatus currentStatus = jobStatuses.get(jobId);
-        if (currentStatus != null) {
-            currentStatus.setStatus("PROCESSING");
-            currentStatus.setMessage(message);
-            currentStatus.setProgress(progress);
-        }
-    }
+    private final ConcurrentHashMap<String, JobStatus> jobStatuses;
 
     @Async("cartoonTaskExecutor")
-    public void generateCartoonAsync(String jobId, String story, boolean includeDialogue) {
+    public CompletableFuture<Void> generateCartoonPanels(String jobId, String story, boolean includeDialog) {
+        JobStatus status = jobStatuses.get(jobId);
         try {
-            jobStatuses.put(jobId, JobStatus.builder().jobId(jobId).status("SUBMITTED").progress(5).message("Job submitted").build());
-            log.info("Job {} async process started.", jobId);
+            log.info("Job {} started: Story - '{}', Include Dialog - {}", jobId, story, includeDialog);
+            if (status == null) {
+                log.error("JobStatus not found for job id: {}", jobId);
+                return CompletableFuture.completedFuture(null);
+            }
 
-            updateJobProgress(jobId, "Generating character descriptions", 10);
-            String characterDescriptions = vertexAiService.getCharacterDescriptions(story);
-            log.info("Job {}: Generated character descriptions.", jobId);
+            status.setMessage("Generating consistent prompts...");
+            status.setProgress(5);
 
-            updateJobProgress(jobId, "Generating character reference image", 25);
-            String referenceImageBase64 = vertexAiService.generateCharacterReferenceImage(characterDescriptions);
-            log.info("Job {}: Generated character reference image.", jobId);
+            List<String> prompts = vertexAiService.generateConsistentPrompts(story, includeDialog).block();
+            if (prompts == null || prompts.isEmpty()) {
+                throw new IllegalStateException("Generated prompt list is null or empty.");
+            }
+            log.info("Job {}: Generated {} prompts.", jobId, prompts.size());
+            status.setPrompts(prompts);
+            status.setMessage("Prompts generated. Starting image generation...");
+            status.setProgress(10);
 
-
-            updateJobProgress(jobId, "Generating panel prompts", 40);
-            List<String> panelPrompts = vertexAiService.getPanelPrompts(story, characterDescriptions, includeDialogue);
-            log.info("Job {}: Generated {} panel prompts.", jobId, panelPrompts.size());
-
-
-            int totalPanels = panelPrompts.size();
-            AtomicInteger panelsDone = new AtomicInteger(0);
-
-            List<CompletableFuture<PanelResult>> futures = IntStream.range(0, totalPanels)
-                    .mapToObj(i -> {
-                        String prompt = panelPrompts.get(i);
-                        return CompletableFuture.supplyAsync(() -> {
-                            try {
-                                log.info("Job {}: Generating image for panel {} with prompt: '{}'", jobId, i + 1, prompt);
-                                String imageBase64 = vertexAiService.generateImageFromPromptAndReference(prompt, referenceImageBase64);
-                                int doneCount = panelsDone.incrementAndGet();
-                                int progress = 40 + (int) ((double) doneCount / totalPanels * 60);
-                                updateJobProgress(jobId, String.format("Generated panel %d of %d", doneCount, totalPanels), progress);
-                                log.info("Job {}: Successfully generated image for panel {}.", jobId, i + 1);
-                                return new PanelResult(prompt, imageBase64);
-                            } catch (IOException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }, cartoonTaskExecutor);
+            List<PanelResult> panelResults = Flux.fromIterable(prompts)
+                    .parallel()
+                    .runOn(Schedulers.parallel())
+                    .flatMap(prompt -> {
+                        int index = prompts.indexOf(prompt);
+                        log.info("Job {}: Generating image for prompt {}/{}", jobId, index + 1, prompts.size());
+                        return vertexAiService.generateImage(prompt)
+                                .retry(2)
+                                .map(imageData -> {
+                                    log.info("Job {}: Successfully generated image for prompt {}/{}", jobId, index + 1, prompts.size());
+                                    // Periodically update main status progress
+                                    synchronized (status) {
+                                        int currentProgress = status.getProgress();
+                                        if (prompts.size() > 0) {
+                                           status.setProgress(currentProgress + (90 / prompts.size()));
+                                        }
+                                    }
+                                    return new PanelResult(index, "success", imageData);
+                                })
+                                .switchIfEmpty(Mono.fromCallable(() -> {
+                                    log.warn("Job {}: Image generation for prompt {}/{} failed after retries.", jobId, index + 1, prompts.size());
+                                    return new PanelResult(index, "failed", null);
+                                }))
+                                .doOnError(e -> log.error("Job {}: Error generating image for prompt: {}", jobId, prompt, e))
+                                .onErrorResume(e -> Mono.just(new PanelResult(index, "failed", null)));
                     })
-                    .collect(Collectors.toList());
+                    .sequential()
+                    .collectList()
+                    .block();
 
-            CompletableFuture<Void> allOf = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
-            List<PanelResult> panelResults = allOf.thenApply(v ->
-                    futures.stream()
-                            .map(CompletableFuture::join)
-                            .collect(Collectors.toList())
-            ).get();
+            if (panelResults == null) {
+                throw new IllegalStateException("Panel generation resulted in null list.");
+            }
 
+            panelResults.sort(java.util.Comparator.comparingInt(PanelResult::getIndex));
 
-            jobStatuses.put(jobId, JobStatus.completed(jobId, story, characterDescriptions, panelResults));
-            log.info("Job {} completed successfully.", jobId);
+            long failedCount = panelResults.stream().filter(p -> "failed".equals(p.getStatus())).count();
+            if (failedCount > 0) {
+                 log.warn("Job {} finished with {} failed images.", jobId, failedCount);
+                 status.setMessage(String.format("Generation complete with %d error(s).", failedCount));
+            } else {
+                 log.info("Job {} completed successfully.", jobId);
+                 status.setMessage("Generation complete!");
+            }
+
+            status.setProgress(100);
+            status.setCompleted(true);
+            status.setPanelResults(panelResults);
 
         } catch (Exception e) {
-            String errorMessage = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
-            jobStatuses.put(jobId, JobStatus.failed(jobId, errorMessage));
-            log.error("Job {} failed in async worker.", jobId, e);
+            log.error("Error during cartoon generation for job id: {}", jobId, e);
+            if (status != null) {
+                status.setCompleted(true);
+                status.setProgress(100);
+                status.setMessage("Failed: " + e.getMessage());
+            }
         }
+        return CompletableFuture.completedFuture(null);
     }
 }

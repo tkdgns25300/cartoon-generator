@@ -13,12 +13,13 @@ import java.util.concurrent.ConcurrentHashMap;
 public class CartoonGenerationService {
 
     private final CartoonGenerationWorker cartoonGenerationWorker;
-    private final ConcurrentHashMap<String, JobStatus> jobStatuses = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, JobStatus> jobStatuses;
 
     public String submitJob(CartoonGenerationRequest request) {
         String jobId = UUID.randomUUID().toString();
-        jobStatuses.put(jobId, JobStatus.submitted(jobId));
-        cartoonGenerationWorker.generateCartoonAsync(jobId, request.getStory(), request.isIncludeDialogue());
+        JobStatus status = new JobStatus(jobId, false, 5, "Submitted. Waiting for process to start...", null, null, request.getStory());
+        jobStatuses.put(jobId, status);
+        cartoonGenerationWorker.generateCartoonPanels(jobId, request.getStory(), request.isIncludeDialogue());
         return jobId;
     }
 

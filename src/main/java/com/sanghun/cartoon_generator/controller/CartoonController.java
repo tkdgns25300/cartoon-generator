@@ -44,13 +44,15 @@ public class CartoonController {
     @GetMapping("/result/{jobId}")
     public String resultPage(@PathVariable String jobId, Model model) {
         JobStatus status = cartoonGenerationService.getJobStatus(jobId);
-        if (status != null && "COMPLETED".equals(status.getStatus())) {
-            model.addAttribute("story", status.getStory());
-            model.addAttribute("characterDescriptions", status.getCharacterDescriptions());
-            model.addAttribute("panels", status.getResults());
+        if (status != null && status.isCompleted()) {
+            model.addAttribute("originalStory", status.getOriginalStory());
+            model.addAttribute("prompts", status.getPrompts());
+            model.addAttribute("panelResults", status.getPanelResults());
+            model.addAttribute("error", status.getMessage());
+        } else if (status != null) {
+            model.addAttribute("error", "Cartoon generation is still in progress. Please wait and refresh.");
         } else {
-            // Handle cases where the job is not found, not complete, or failed
-            model.addAttribute("error", "Cartoon generation failed or is still in progress.");
+            model.addAttribute("error", "Job not found.");
         }
         return "result";
     }

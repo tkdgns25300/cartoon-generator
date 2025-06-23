@@ -1,13 +1,14 @@
 package com.sanghun.cartoon_generator.dto;
 
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-@Data
+@Getter
 @NoArgsConstructor
 @AllArgsConstructor
 public class PanelResult {
-    private String prompt;
-    private String image; // Base64 encoded image
+    private int index;
+    private String status;
+    private String imageData;
 } 
