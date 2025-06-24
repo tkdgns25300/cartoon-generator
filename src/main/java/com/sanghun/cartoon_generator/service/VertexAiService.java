@@ -68,13 +68,41 @@ public class VertexAiService {
 
     public List<String> generateStoryPrompts(String storyIdea) throws IOException {
         log.info("Generating 10 story prompts from idea: {}", storyIdea);
-        String prompt = "You are a creative storyteller. Based on the following theme or story idea, create a sequence of exactly 10 scenes that form a coherent short story. "
+        String prompt = "You are an expert prompt engineer for a text-to-image model, specializing in creating coherent, multi-panel stories with high character consistency.\n"
                 +
-                "For each scene, write a detailed and vivid image generation prompt. The prompts should be sequential and build upon each other. "
+                "Your task is to create a series of 10 detailed, consistent, and vivid prompts for a 10-panel cartoon based on the following story idea.\n\n"
                 +
-                "CRITICAL: Separate each of the 10 prompts with '---'. Do not include any introductory text, titles, or numbering. Just the 10 prompts separated by '---'.\n\n"
+                "STORY IDEA: \"" + storyIdea + "\"\n\n" +
+                "## CRITICAL INSTRUCTIONS:\n" +
+                "1.  **Analyze and Create a Character Sheet (Internal):** First, identify the main characters. For each character, create a detailed 'Character Sheet' for your internal use. This sheet must define consistent attributes that you will use in EVERY prompt where the character appears.\n\n"
                 +
-                "Story Idea: \"" + storyIdea + "\"";
+                "2.  **Enforce Strict Consistency Using the Character Sheet:**\n" +
+                "    *   **Unique Name/Role:** Use a unique, memorable name like 'Bruno the Bear' or 'Luna the Rabbit'.\n"
+                +
+                "    *   **Species/Body Ratio:** Fix the size ratio, e.g., 'Bruno stands twice Luna's height'.\n" +
+                "    *   **Colors (Fur, Eyes, etc.):** Be specific and unchanging, e.g., 'chestnut-brown fur, hazel eyes'.\n"
+                +
+                "    *   **Signature Outfit:** A defining, unchanging piece of clothing, e.g., 'a mint-green knit scarf'.\n"
+                +
+                "    *   **Props/Accessories:** Unique items they always carry, e.g., 'a vintage leather camera'.\n" +
+                "    *   **Distinctive Markings/Hair:** A fixed physical feature, e.g., 'a white patch over the left ear'.\n"
+                +
+                "    *   **Personality Keywords:** Use recurring keywords for expressions, e.g., 'a gentle, curious smile'.\n\n"
+                +
+                "3.  **Enforce Scene and Style Consistency:**\n" +
+                "    *   **Overall Style:** The style must be consistent throughout all 10 panels. Specify a single, clear style, e.g., 'charming children's book illustration', 'digital art, whimsical and vibrant', or 'Studio Ghibli anime style'. This style component is mandatory for every prompt.\n"
+                +
+                "    *   **Fixed Color Palette:** Maintain a consistent color palette, e.g., 'pastel greens, yellows, peach highlights'.\n"
+                +
+                "    *   **Viewpoint/Camera Angle:** Keep a relatively stable camera perspective, e.g., 'eye-level three-quarter view'.\n\n"
+                +
+                "4.  **Negative Prompts:** Use negative prompts to prevent unwanted variations, e.g., '--no outfit changes, --no different fur colors'.\n\n"
+                +
+                "5.  **Output Format and Structure:** Each of the 10 prompts you generate must be explicitly structured to contain these three core elements: **Style, Subject, and Context/Background.** For example: 'Style: Studio Ghibli anime style. Subject: Bruno the Bear giving Luna the Rabbit a flower. Context: in a sun-dappled forest clearing.'\n"
+                +
+                "    Your final output MUST be ONLY the 10 structured prompts, separated by '---'. Do NOT include the character sheet, titles, reasoning, or any other extra text in your response. Just the prompts, separated by '---'.\n\n"
+                +
+                "Now, generate the 10 prompts.";
 
         GeminiRequest geminiRequest = GeminiRequest.fromPrompt(prompt);
         String url = String.format(GEMINI_API_ENDPOINT_TEMPLATE, region, projectId, region, geminiModelId);
@@ -84,7 +112,7 @@ public class VertexAiService {
 
         String fullResponse = getTextFromGeminiResponse(response.getBody());
         if (fullResponse != null) {
-            log.info("Successfully generated 10 story prompts.");
+            log.info("Successfully generated 10 consistent story prompts.");
             return Arrays.stream(fullResponse.split("---"))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
