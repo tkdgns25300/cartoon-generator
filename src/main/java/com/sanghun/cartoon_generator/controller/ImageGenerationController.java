@@ -1,5 +1,6 @@
 package com.sanghun.cartoon_generator.controller;
 
+import com.sanghun.cartoon_generator.dto.GenerationResult;
 import com.sanghun.cartoon_generator.service.ImageGenerationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -21,9 +22,10 @@ public class ImageGenerationController {
 
     @PostMapping("/generate")
     public String generateImage(@RequestParam String prompt, Model model) {
-        String base64Image = imageGenerationService.generateImage(prompt);
-        model.addAttribute("image", "data:image/png;base64," + base64Image);
-        model.addAttribute("prompt", prompt);
+        GenerationResult result = imageGenerationService.generateImageAndPrompts(prompt);
+        model.addAttribute("image", "data:image/png;base64," + result.getBase64Image());
+        model.addAttribute("prompts", result.getGeneratedPrompts());
+        model.addAttribute("originalPrompt", prompt);
         return "index";
     }
 }
