@@ -2,10 +2,8 @@ package com.sanghun.cartoon_generator.dto;
 
 import lombok.Value;
 
-import java.util.List;
-
 @Value
-public class GenerationResult {
+public class PanelResult {
+    String prompt;
     String base64Image;
-    List<String> generatedPrompts;
 }

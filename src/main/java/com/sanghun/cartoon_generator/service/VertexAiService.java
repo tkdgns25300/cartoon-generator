@@ -66,14 +66,15 @@ public class VertexAiService {
         throw new IOException("Failed to generate single image from Vertex AI");
     }
 
-    public List<String> generateTenPrompts(String originalPrompt) throws IOException {
-        log.info("Generating 10 prompts from original: {}", originalPrompt);
-        String prompt = "Based on the following user request, generate exactly 10 detailed and creative prompts for an image generation model. "
+    public List<String> generateStoryPrompts(String storyIdea) throws IOException {
+        log.info("Generating 10 story prompts from idea: {}", storyIdea);
+        String prompt = "You are a creative storyteller. Based on the following theme or story idea, create a sequence of exactly 10 scenes that form a coherent short story. "
                 +
-                "Each prompt should explore a different aspect or interpretation of the original request. " +
-                "Separate each of the 10 prompts with '---'. Do not include any introductory text, titles, or numbering. Just the prompts separated by '---'.\n\n"
+                "For each scene, write a detailed and vivid image generation prompt. The prompts should be sequential and build upon each other. "
                 +
-                "Original Request: \"" + originalPrompt + "\"";
+                "CRITICAL: Separate each of the 10 prompts with '---'. Do not include any introductory text, titles, or numbering. Just the 10 prompts separated by '---'.\n\n"
+                +
+                "Story Idea: \"" + storyIdea + "\"";
 
         GeminiRequest geminiRequest = GeminiRequest.fromPrompt(prompt);
         String url = String.format(GEMINI_API_ENDPOINT_TEMPLATE, region, projectId, region, geminiModelId);
@@ -83,13 +84,13 @@ public class VertexAiService {
 
         String fullResponse = getTextFromGeminiResponse(response.getBody());
         if (fullResponse != null) {
-            log.info("Successfully generated 10 prompts.");
+            log.info("Successfully generated 10 story prompts.");
             return Arrays.stream(fullResponse.split("---"))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
                     .collect(Collectors.toList());
         }
-        log.warn("Failed to generate 10 prompts from Vertex AI. Response was empty.");
+        log.warn("Failed to generate 10 story prompts from Vertex AI. Response was empty.");
         return Collections.emptyList();
     }
 

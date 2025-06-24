@@ -1,6 +1,6 @@
 package com.sanghun.cartoon_generator.controller;
 
-import com.sanghun.cartoon_generator.dto.GenerationResult;
+import com.sanghun.cartoon_generator.dto.PanelResult;
 import com.sanghun.cartoon_generator.service.ImageGenerationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -8,6 +8,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.List;
 
 @Controller
 @RequiredArgsConstructor
@@ -22,9 +24,8 @@ public class ImageGenerationController {
 
     @PostMapping("/generate")
     public String generateImage(@RequestParam String prompt, Model model) {
-        GenerationResult result = imageGenerationService.generateImageAndPrompts(prompt);
-        model.addAttribute("image", "data:image/png;base64," + result.getBase64Image());
-        model.addAttribute("prompts", result.getGeneratedPrompts());
+        List<PanelResult> panels = imageGenerationService.generateCartoonPanels(prompt);
+        model.addAttribute("panels", panels);
         model.addAttribute("originalPrompt", prompt);
         return "index";
     }
