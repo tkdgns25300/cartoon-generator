@@ -14,8 +14,7 @@ public class ImagenRequest {
     private List<Instance> instances;
     private Parameters parameters;
 
-    public ImagenRequest(Instance instance, Parameters parameters) {
-        this.instances = Collections.singletonList(instance);
-        this.parameters = parameters;
+    public static ImagenRequest fromInstance(Instance instance) {
+        return new ImagenRequest(Collections.singletonList(instance), new Parameters(1));
     }
 }
