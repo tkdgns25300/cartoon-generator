@@ -35,6 +35,9 @@ public class VertexAiService {
     private final String geminiModelId;
     private final GoogleCredentials credentials;
 
+    private static final int MAX_RETRIES = 3;
+    private static final long RETRY_DELAY_MS = 2000;
+
     public VertexAiService(RestTemplate restTemplate,
             @Value("${google.cloud.project-id}") String projectId,
             @Value("${google.cloud.region}") String region,
@@ -51,19 +54,38 @@ public class VertexAiService {
 
     public String generateSingleImage(String prompt) throws IOException {
         log.info("Generating single image for prompt: {}", prompt);
-        Instance instance = Instance.fromPrompt(prompt);
-        ImagenRequest imagenRequest = ImagenRequest.fromInstance(instance);
-        String url = String.format(IMAGEN_API_ENDPOINT_TEMPLATE, region, projectId, region, imagenModelId);
-        ResponseEntity<ImagenResponse> response = restTemplate.postForEntity(url,
-                new HttpEntity<>(imagenRequest, createHeaders()), ImagenResponse.class);
+        Exception lastException = null;
 
-        if (response.getBody() != null && response.getBody().getPredictions() != null
-                && !response.getBody().getPredictions().isEmpty()) {
-            String base64Image = response.getBody().getPredictions().get(0).getBytesBase64Encoded();
-            log.info("Successfully generated single image.");
-            return base64Image;
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                Instance instance = Instance.fromPrompt(prompt);
+                ImagenRequest imagenRequest = ImagenRequest.fromInstance(instance);
+                String url = String.format(IMAGEN_API_ENDPOINT_TEMPLATE, region, projectId, region, imagenModelId);
+                ResponseEntity<ImagenResponse> response = restTemplate.postForEntity(url,
+                        new HttpEntity<>(imagenRequest, createHeaders()), ImagenResponse.class);
+
+                if (response.getBody() != null && response.getBody().getPredictions() != null
+                        && !response.getBody().getPredictions().isEmpty()) {
+                    String base64Image = response.getBody().getPredictions().get(0).getBytesBase64Encoded();
+                    log.info("Successfully generated single image on attempt {}/{}", attempt, MAX_RETRIES);
+                    return base64Image;
+                } else {
+                    throw new IOException("Vertex AI returned a response with no image data.");
+                }
+            } catch (Exception e) {
+                lastException = e;
+                log.warn("Attempt {}/{} failed to generate image for prompt: {}. Error: {}", attempt, MAX_RETRIES, prompt, e.getMessage());
+                if (attempt < MAX_RETRIES) {
+                    try {
+                        Thread.sleep(RETRY_DELAY_MS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("Image generation retry was interrupted", ie);
+                    }
+                }
+            }
         }
-        throw new IOException("Failed to generate single image from Vertex AI");
+        throw new IOException("Failed to generate single image from Vertex AI after " + MAX_RETRIES + " attempts for prompt: " + prompt, lastException);
     }
 
     public List<String> generateStoryPrompts(String storyIdea) throws IOException {
