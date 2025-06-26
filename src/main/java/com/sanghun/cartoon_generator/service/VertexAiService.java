@@ -44,10 +44,10 @@ public class VertexAiService {
             @Value("${google.cloud.imagen-model-id}") String imagenModelId,
             @Value("${google.cloud.gemini-model-id}") String geminiModelId) throws IOException {
         this.restTemplate = restTemplate;
-        this.projectId = projectId;
-        this.region = region;
-        this.imagenModelId = imagenModelId;
-        this.geminiModelId = geminiModelId;
+        this.projectId = projectId.trim();
+        this.region = region.trim();
+        this.imagenModelId = imagenModelId.trim();
+        this.geminiModelId = geminiModelId.trim();
         this.credentials = GoogleCredentials.getApplicationDefault()
                 .createScoped("https://www.googleapis.com/auth/cloud-platform");
     }
