@@ -4,15 +4,69 @@
         <meta charset="UTF-8" />
         <title>AI Cartoon Generator</title>
         <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 40px auto; padding: 20px; background-color: #f8f9fa; }
-            h1 { color: #212529; text-align: center; }
-            form { display: flex; flex-direction: column; gap: 15px; margin-bottom: 30px; }
-            textarea { padding: 10px; border-radius: 8px; border: 1px solid #ced4da; font-size: 16px; min-height: 80px; }
-            button { cursor: pointer; background-color: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-size: 16px; font-weight: bold; transition: background-color 0.2s; }
-            button:hover { background-color: #0056b3; }
-            .result-container { margin-top: 20px; padding: 20px; border-radius: 8px; }
-            h2 { color: #495057; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
-            .original-prompt { word-break: break-word; background-color: #e9ecef; padding: 15px; border-radius: 8px; font-style: italic; margin-bottom: 25px; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 1200px;
+                margin: 40px auto;
+                padding: 20px;
+                background-color: #f8f9fa;
+            }
+            h1 {
+                color: #212529;
+                text-align: center;
+            }
+            form {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+                margin-bottom: 30px;
+            }
+            textarea {
+                padding: 10px;
+                border-radius: 8px;
+                border: 1px solid #ced4da;
+                font-size: 16px;
+                min-height: 80px;
+            }
+            button {
+                cursor: pointer;
+                background-color: #007bff;
+                color: white;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: bold;
+                transition: background-color 0.2s;
+            }
+            button:hover {
+                background-color: #0056b3;
+            }
+            button:disabled {
+                background-color: #6c757d;
+                cursor: not-allowed;
+            }
+            .result-container {
+                margin-top: 20px;
+                padding: 20px;
+                border-radius: 8px;
+            }
+            h2 {
+                color: #495057;
+                border-bottom: 2px solid #eee;
+                padding-bottom: 10px;
+                margin-bottom: 15px;
+            }
+            .original-prompt {
+                word-break: break-word;
+                background-color: #e9ecef;
+                padding: 15px;
+                border-radius: 8px;
+                font-style: italic;
+                margin-bottom: 25px;
+            }
 
             .cartoon-grid {
                 display: grid;
@@ -26,7 +80,19 @@
                 padding: 15px;
                 display: flex;
                 flex-direction: column;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+                opacity: 0;
+                animation: fadeIn 0.5s forwards;
+            }
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(10px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
             }
             .panel-number {
                 font-size: 1.5em;
@@ -45,7 +111,7 @@
                 font-size: 0.9em;
                 color: #6c757d;
             }
-             .panel-error {
+            .panel-error {
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -56,28 +122,177 @@
                 border-radius: 8px;
                 margin-bottom: 10px;
             }
-
+            #progress-container {
+                margin-bottom: 30px;
+            }
+            #progress-bar-container {
+                width: 100%;
+                background-color: #e9ecef;
+                border-radius: 8px;
+                overflow: hidden;
+            }
+            #progress-bar {
+                width: 0;
+                height: 30px;
+                background-color: #007bff;
+                text-align: center;
+                line-height: 30px;
+                color: white;
+                transition: width 0.3s ease-in-out;
+            }
+            .error-message {
+                background-color: #f8d7da;
+                color: #721c24;
+                padding: 15px;
+                border: 1px solid #f5c6cb;
+                border-radius: 8px;
+                margin-top: 20px;
+            }
         </style>
     </head>
     <body>
         <h1>AI Cartoon Generator</h1>
 
-        <form th:action="@{/generate}" method="post">
-            <textarea name="prompt" placeholder="Enter a story idea or a theme for your cartoon..." required th:text="${originalPrompt}"></textarea>
+        <form id="generation-form">
+            <textarea name="prompt" placeholder="Enter a story idea or a theme for your cartoon..." required></textarea>
             <button type="submit">Generate Cartoon</button>
         </form>
 
-        <div th:if="${panels}" class="result-container">
+        <div id="progress-container" style="display: none">
+            <div id="progress-bar-container">
+                <div id="progress-bar">0%</div>
+            </div>
+            <p id="progress-status" style="text-align: center; margin-top: 10px; color: #6c757d"></p>
+        </div>
+
+        <div id="error-container" style="display: none"></div>
+
+        <div id="result-container" style="display: none">
             <h2>Generated 10-Panel Cartoon</h2>
-            <p class="original-prompt" th:text="${originalPrompt}"></p>
-            <div class="cartoon-grid">
-                <div th:each="panel, iterStat : ${panels}" class="panel">
-                    <div class="panel-number" th:text="${iterStat.count}"></div>
-                    <img th:if="${panel.base64Image}" th:src="'data:image/png;base64,' + ${panel.base64Image}" alt="Generated Panel">
-                    <div th:if="${panel.base64Image == null}" class="panel-error">Image generation failed</div>
-                    <p class="panel-prompt" th:text="${panel.prompt}"></p>
-                </div>
+            <p class="original-prompt" id="original-prompt-display"></p>
+            <div class="cartoon-grid" id="cartoon-grid">
+                <!-- Panels will be inserted here by JavaScript -->
             </div>
         </div>
+
+        <script>
+            const form = document.getElementById("generation-form");
+            const promptTextarea = document.querySelector('textarea[name="prompt"]');
+            const submitButton = document.querySelector('button[type="submit"]');
+
+            const progressContainer = document.getElementById("progress-container");
+            const progressStatus = document.getElementById("progress-status");
+            const progressBar = document.getElementById("progress-bar");
+
+            const resultContainer = document.getElementById("result-container");
+            const originalPromptDisplay = document.getElementById("original-prompt-display");
+            const cartoonGrid = document.getElementById("cartoon-grid");
+            const errorContainer = document.getElementById("error-container");
+
+            let eventSource;
+
+            form.addEventListener("submit", (e) => {
+                e.preventDefault();
+                const prompt = promptTextarea.value.trim();
+                if (!prompt) {
+                    alert("Please enter a story idea.");
+                    return;
+                }
+
+                // 1. Reset and prepare UI for loading
+                submitButton.disabled = true;
+                submitButton.textContent = "Generating...";
+                progressContainer.style.display = "block";
+                resultContainer.style.display = "none";
+                errorContainer.style.display = "none";
+                errorContainer.innerHTML = "";
+                cartoonGrid.innerHTML = "";
+                updateProgress(0, "Initializing...");
+
+                // 2. Start SSE connection
+                const encodedPrompt = encodeURIComponent(prompt);
+                eventSource = new EventSource(`/generate?prompt=${encodedPrompt}`);
+
+                // 3. Handle incoming events
+                eventSource.addEventListener("progress", (event) => {
+                    const progressData = JSON.parse(event.data);
+                    updateProgress(progressData.percentage, progressData.message);
+                });
+
+                eventSource.addEventListener("panel", (event) => {
+                    const panelData = JSON.parse(event.data);
+                    addPanelToGrid(panelData);
+                });
+
+                eventSource.addEventListener("complete", (event) => {
+                    progressStatus.textContent = "Done!";
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Generate Again";
+                    eventSource.close();
+                });
+
+                eventSource.addEventListener("error", (event) => {
+                    let errorMessage = "An unknown error occurred during generation.";
+                    if (event.data) {
+                        errorMessage = event.data;
+                    }
+                    showError(errorMessage);
+                    eventSource.close();
+                });
+
+                eventSource.onerror = (err) => {
+                    showError("Connection to server lost. Please try again.");
+                    eventSource.close();
+                };
+            });
+
+            function updateProgress(percentage, message) {
+                progressStatus.textContent = message;
+                progressBar.style.width = percentage + "%";
+                progressBar.textContent = percentage + "%";
+            }
+
+            function addPanelToGrid(panelData) {
+                if (!resultContainer.style.display || resultContainer.style.display === "none") {
+                    resultContainer.style.display = "block";
+                    originalPromptDisplay.textContent = promptTextarea.value;
+                }
+
+                const panelDiv = document.createElement("div");
+                panelDiv.className = "panel";
+
+                const panelNumber = document.createElement("div");
+                panelNumber.className = "panel-number";
+                panelNumber.textContent = cartoonGrid.children.length + 1;
+                panelDiv.appendChild(panelNumber);
+
+                if (panelData.base64Image) {
+                    const img = document.createElement("img");
+                    img.src = "data:image/png;base64," + panelData.base64Image;
+                    img.alt = "Generated Panel";
+                    panelDiv.appendChild(img);
+                } else {
+                    const errorDiv = document.createElement("div");
+                    errorDiv.className = "panel-error";
+                    errorDiv.textContent = "Image generation failed";
+                    panelDiv.appendChild(errorDiv);
+                }
+
+                const promptP = document.createElement("p");
+                promptP.className = "panel-prompt";
+                promptP.textContent = panelData.prompt;
+                panelDiv.appendChild(promptP);
+
+                cartoonGrid.appendChild(panelDiv);
+            }
+
+            function showError(message) {
+                errorContainer.innerHTML = `<div class="error-message">${message}</div>`;
+                errorContainer.style.display = "block";
+                progressContainer.style.display = "none";
+                submitButton.disabled = false;
+                submitButton.textContent = "Try Again";
+            }
+        </script>
     </body>
 </html>

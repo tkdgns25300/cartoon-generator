@@ -6,8 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -22,11 +22,10 @@ public class ImageGenerationController {
         return "index";
     }
 
-    @PostMapping("/generate")
-    public String generateImage(@RequestParam String prompt, Model model) {
-        List<PanelResult> panels = imageGenerationService.generateCartoonPanels(prompt);
-        model.addAttribute("panels", panels);
-        model.addAttribute("originalPrompt", prompt);
-        return "index";
+    @GetMapping("/generate")
+    public SseEmitter generateImage(@RequestParam String prompt) {
+        SseEmitter emitter = new SseEmitter(30 * 60 * 1000L); // 30 minutes timeout
+        imageGenerationService.generateCartoonPanelsWithProgress(prompt, emitter);
+        return emitter;
     }
 }
